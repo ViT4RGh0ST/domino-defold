@@ -1,0 +1,40 @@
+key_trigger {
+  input: KEY_R
+  action: "restart"
+}
+key_trigger {
+  input: KEY_1
+  action: "placeCard1"
+}
+key_trigger {
+  input: KEY_2
+  action: "placeCard2"
+}
+key_trigger {
+  input: KEY_3
+  action: "placeCard3"
+}
+key_trigger {
+  input: KEY_4
+  action: "placeCard4"
+}
+key_trigger {
+  input: KEY_5
+  action: "placeCard5"
+}
+key_trigger {
+  input: KEY_6
+  action: "placeCard6"
+}
+key_trigger {
+  input: KEY_7
+  action: "placeCard7"
+}
+key_trigger {
+  input: KEY_T
+  action: "test"
+}
+mouse_trigger {
+  input: MOUSE_BUTTON_LEFT
+  action: "touch"
+}

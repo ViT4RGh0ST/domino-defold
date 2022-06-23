@@ -1,0 +1,435 @@
+turnOfPlayer = 1
+
+isGameOver = false
+isRoundOver = false
+
+players = {}
+
+cards = {}
+
+teams = {}
+
+game = {
+	rounds = {
+		
+	}
+}
+
+cardToPlaySelected = { card = nil, cardIndex = nil }
+
+function initTeams()
+	for i = 2, 1, -1 do
+		table.insert(teams, {name = '', score = 0})
+	end
+end
+
+function initCards()
+	j = 6
+	for i = 6, 0, -1 do
+		for k = j, 0, -1 do
+			table.insert(cards, {back = i, front = k})
+		end
+		j = j - 1
+	end
+end
+
+function initPlayers()
+	for i = 4, 1, -1 do
+		team = 2
+		if i % 2 == 0 then
+			team = 1
+		end
+		table.insert(players, {name = '', team = team, cards = {}})
+	end
+end
+
+function serveCardsToPlayers()
+	cardsToServe = shuffle(cards)
+	
+	for i = 4, 1, -1 do
+		playersCards = {}
+		
+		for i = 7, 1, -1 do
+			table.insert(playersCards, table.remove(cardsToServe,1))
+		end
+
+		players[i]['cards'] = playersCards
+	end
+end
+
+function nextTurn()
+	if(turnOfPlayer == 4)
+	then
+		turnOfPlayer = 1
+	else
+		turnOfPlayer = turnOfPlayer + 1
+	end
+
+	if areThereCardsPlayed() then
+		if areAllPlayersMissed() then 
+			setWinnerByScoreOfCards()
+			return nil
+		end
+		
+		if isPlayerMissed() then 
+			pprint('player ' .. turnOfPlayer .. ' missed')
+			nextTurn()
+			return nil
+		end
+	end
+	
+	pprint('turn of player ' .. turnOfPlayer)
+	pprint(game['rounds'][#game['rounds']]['playedCards'], players[turnOfPlayer]['cards'])
+	
+	if areThereCardsPlayed() then
+		head = getHeadValue()
+		tail = getTailValue()
+		print('head', head)
+		print('tail', tail)
+	end
+end
+
+function setWinnerByScoreOfCards()
+	print('round over by score of cards')
+	scoreTeam1 = getScoreByTeam(1)
+	scoreTeam2 = getScoreByTeam(2)
+	
+	if scoreTeam1 > scoreTeam2 then
+		setScoreToTeam(1, scoreTeam1)
+	else
+		setScoreToTeam(2, scoreTeam2)
+	end
+
+	setNextRoundOrSetGameOver()
+end
+
+function areThereCardsPlayed()
+	rounds = game['rounds']
+	return #rounds[#rounds]['playedCards'] ~= 0
+end
+
+function areAllPlayersMissed()
+	for key, player in ipairs(players) do
+		if areThereACardValidToBePlayed(player['cards']) then
+			return false
+		end
+	end
+	
+	return true
+end
+
+
+function isPlayerMissed()
+	return areThereACardValidToBePlayed(players[turnOfPlayer]['cards']) == false
+end
+
+function areThereACardValidToBePlayed(cards)
+	for key, card in ipairs(cards) do
+		if isCardValidToBePlayed(card) then
+			return true
+		end
+	end
+
+	return false
+end
+
+function playerSelectCardToPlace(cardIndex)
+	cardSelected = players[turnOfPlayer]['cards'][cardIndex]
+	
+	if cardSelected == nil then
+		return false
+	end
+	
+	head = getHeadValue()
+	tail = getTailValue()
+	
+	if cardToPlaySelected['card'] ~= nil and (cardIndex == 1 or cardIndex == 2) then 
+		if cardIndex == 1 then 
+			connected = head
+		else
+			connected = tail
+		end
+
+		playerPlaceCard(cardToPlaySelected['card'], cardToPlaySelected['cardIndex'], connected)
+		cardToPlaySelected['card'] = nil
+		cardToPlaySelected['cardIndex'] = nil
+
+		return true
+	end
+	
+	if isCardValidToBePlayed(cardSelected) then
+		coincidences = 0
+
+		if isCardADouble(cardSelected) then
+			coincidences = coincidences - 1
+		end
+		
+		--check the open value
+		for key, value in pairs(cardSelected) do
+			
+			if head == value then
+				connected = value
+				coincidences = coincidences + 1
+			end
+			
+			if tail == value then
+				connected = value
+				coincidences = coincidences + 1
+			end
+
+			if head == tail then
+				coincidences = coincidences - 1
+			end
+
+
+		end
+
+		if coincidences == 2 and cardToPlaySelected['card'] == nil then
+			cardToPlaySelected['card'] = cardSelected
+			cardToPlaySelected['cardIndex'] = cardIndex
+			--select side of card to play
+			print('1 to play', head)
+			print('2 to play', tail)
+			return false
+		end
+
+		playerPlaceCard(cardSelected, cardIndex, connected)
+		return true
+	else
+		pprint('card not valid')
+	end
+
+	return false
+end
+
+function isCardADouble(card)
+	return card['front'] == card['back']
+end
+
+function playerPlaceCard(playedCard, cardIndex, connected)
+	head = getHeadValue()
+	tail = getTailValue()
+	
+	--check whether insert card at start or at the end
+	insertAtHead = false
+	if connected == head then 
+		insertAtHead = true
+	end
+
+	front = playedCard['front']
+	back = playedCard['back']
+
+	if connected == front then
+		open = back
+	else
+		open = front
+	end
+	
+	addPlayedCardOnRound(playedCard, turnOfPlayer, open, insertAtHead)
+	removeCardFromCurrentPlayerHand(cardIndex)
+	
+	if isWinningPlayerOfRound() then 
+		print('round over by card placed')
+		setScoreToTeam(players[turnOfPlayer]['team'], getScoreFromLoserTeam())
+		setNextRoundOrSetGameOver()
+		return nil
+	end
+	
+	nextTurn()
+end
+
+function setNextRoundOrSetGameOver()
+	if getTotalScoreFromWinners() > 99 then
+		print('Game Over')
+	else
+		startANewRound()
+		nextTurn()
+	end
+end
+
+function startANewRound()
+	print('new round started')
+
+	serveCardsToPlayers()
+
+	table.insert(game['rounds'], {
+		history = {},
+		playedCards = {},
+		teamVictory = 0,
+		score = 0
+	})
+end
+
+function isWinningPlayerOfRound()
+	return #players[turnOfPlayer]['cards'] == 0
+end
+
+function setScoreToTeam(team, score)
+	print('round is over team winner ' .. team .. ' with score ' .. score)
+	rounds = game['rounds']
+	game['rounds'][#rounds]['teamVictory'] = team
+	game['rounds'][#rounds]['score'] = score
+end
+
+function getTotalScoreFromWinners()
+	score = 0
+	winnerTeam = players[turnOfPlayer]['team']
+	for index, round  in ipairs(game['rounds']) do
+		if winnerTeam == round['teamVictory'] then
+			score = score + round['score']
+		end
+	end
+	return score
+end
+
+function getScoreFromLoserTeam()
+	winnerTeam = players[turnOfPlayer]['team']
+	loserTeam = 1
+	if winnerTeam == 1 then 
+		loserTeam = 2
+	end
+	return getScoreByTeam(loserTeam)
+end
+
+function getScoreByTeam(team)
+	score = 0
+	for playerIndex, player in ipairs(players) do
+		if player['team'] == team then 
+			score = score + getScoreFromCards(player['cards'])
+		end
+	end
+	return score
+end
+
+function getScoreFromCards(cards)
+	score = 0
+	for cardIndex, card in ipairs(cards) do
+		cardSum = card['front'] + card['back']
+		score = score + cardSum
+	end
+	return score
+end
+
+function addPlayedCardOnRound(playedCard, playerOwner, open, insertAtHead)	
+	currentRounds = game['rounds']
+	
+	if insertAtHead then
+		currentRounds[#currentRounds]['playedCards'] = insertAtFirst(currentRounds[#currentRounds]['playedCards'], {
+			card = playedCard, 
+			playerOwner = playerOwner, 
+			open = open
+		})
+	else
+		table.insert(currentRounds[#currentRounds]['playedCards'], {
+			card = playedCard, 
+			playerOwner = playerOwner, 
+			open = open
+		})
+	end
+	
+	
+end
+
+function getCurrentPlayedCards()
+	currentRounds = game['rounds']
+	return currentRounds[#currentRounds]['playedCards']
+end
+
+function getHeadValue()
+	currentPlayedCards = getCurrentPlayedCards()
+	return currentPlayedCards[1]['open']
+end
+
+function getTailValue()
+	currentPlayedCards = getCurrentPlayedCards()
+	return currentPlayedCards[#currentPlayedCards]['open']
+end
+
+function isCardValidToBePlayed(cardSelected)
+	head = getHeadValue()
+	tail = getTailValue()
+
+	if cardSelected['front'] == head or cardSelected['front'] == tail or cardSelected['back'] == head or cardSelected['back'] == tail then 
+		return true
+	end
+
+	return false
+end
+
+function removeCardFromCurrentPlayerHand(cardIndex)
+	table.remove(players[turnOfPlayer]['cards'], cardIndex)
+end
+
+function startANewGame()
+	startANewRound()
+	
+	for player = 4, 1, -1 do
+		for cardIndex = 7, 1, -1 do
+			playerCard = players[player]['cards'][cardIndex]
+			if playerCard['front'] == 6 and playerCard['back'] == 6 then
+				turnOfPlayer = player
+				addPlayedCardOnRound(playerCard, player, playerCard['front'], false)
+				removeCardFromCurrentPlayerHand(cardIndex)
+				nextTurn()
+				
+			end
+		end
+	end
+
+	-- pprint()
+	
+end
+
+function init(self)
+	msg.post(".", "acquire_input_focus")
+	msg.post("@render:", "use_fixed_fit_projection", { near = -1, far = 1 })
+	-- pprint(cards)
+	initCards()
+end
+
+function on_input(self, action_id, action)	
+	if action_id == hash("restart") and action.pressed then
+		initPlayers()
+		initTeams()
+		startANewGame()
+		-- pprint(, players[turnOfPlayer - 1])
+	end
+
+	if action_id == hash("test") and action.pressed then
+	
+		
+		pprint(players)
+		pprint(getScoreFromLoserTeam())
+		pprint(turnOfPlayer)
+		
+	end
+
+	if #players > 0 then
+		for i = #players[turnOfPlayer]['cards'], 1, -1 do
+			if action_id == hash("placeCard" .. i) and action.pressed then
+				playerSelectCardToPlace(i)
+			end
+		end
+	end
+	
+end
+
+function insertAtFirst(tbl, newValue)
+	newTable = {newValue}
+	for key, value in ipairs(tbl) do
+		table.insert(newTable, value)
+	end
+	return newTable
+end
+
+function shuffle(t)
+	local tbl = {}
+	for i = 1, #t do
+		tbl[i] = t[i]
+	end
+	for i = #tbl, 2, -1 do
+		local j = math.random(i)
+		tbl[i], tbl[j] = tbl[j], tbl[i]
+	end
+	return tbl
+end
